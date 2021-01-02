@@ -978,10 +978,10 @@ to-regex-range@^5.0.1:
   dependencies:
     is-number "^7.0.0"
 
-ts-coder@^0.0.3:
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/ts-coder/-/ts-coder-0.0.3.tgz#4b042cef8b6539e06b2d38e81318f80482380421"
-  integrity sha512-LZP5jzQs2eZpXlKNjNS1GTj0hUzywx7V1//b/pm5emHjqze9uNHpc0yEOPhOexz+AODQC4GoCeBn7JvP7jhHyA==
+ts-coder@0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/ts-coder/-/ts-coder-0.0.1.tgz#f126574397ff8d89cfeb14d64d6a0a7799a1b602"
+  integrity sha512-bzk/us+HdiBkZCjJL9Ob4MjcBk0DB+gomR1VErXPxvrgKTxx0QLygJHUnWQSMjDB4n1ydKaj48Qc6OJZH6+cYw==
   dependencies:
     bit-buffer "^0.2.4"
 
