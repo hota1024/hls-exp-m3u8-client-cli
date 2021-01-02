@@ -230,6 +230,11 @@ balanced-match@^1.0.0:
   resolved "https://registry.yarnpkg.com/balanced-match/-/balanced-match-1.0.0.tgz#89b4d199ab2bee49de164ea02b89ce462d71b767"
   integrity sha1-ibTRmasr7kneFk6gK4nORi1xt2c=
 
+bit-buffer@^0.2.4:
+  version "0.2.4"
+  resolved "https://registry.yarnpkg.com/bit-buffer/-/bit-buffer-0.2.4.tgz#5520ffb2f656734d44ab9227d88a4be234364a0b"
+  integrity sha512-j4rQZTEpdCkb662lkiemA4mlcv9IraC8yA+BnMT4wzOldUCKPTkbgKXL6nwRqtlqiuh+GZYh/sFAzXPpUd9FPQ==
+
 brace-expansion@^1.1.7:
   version "1.1.11"
   resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-1.1.11.tgz#3c7fcbf529d87226f3d2f52b966ff5271eb441dd"
@@ -972,6 +977,13 @@ to-regex-range@^5.0.1:
   integrity sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==
   dependencies:
     is-number "^7.0.0"
+
+ts-coder@^0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/ts-coder/-/ts-coder-0.0.2.tgz#e3a2046bd032ec0d73ebee5110b7cfd860f6d9b1"
+  integrity sha512-GGSzDVue0K/Xd6HTNE3BK8Hc7SYlu44SQaTt2MEg8pjArQNpt0mtZ8OjNFIDULLn9NqtxTmfFLoMh9hkxfjz0w==
+  dependencies:
+    bit-buffer "^0.2.4"
 
 tslib@^1.8.1:
   version "1.14.1"
