@@ -7,6 +7,8 @@ import * as axiosRetry from 'axios-retry'
 // eslint-disable-next-line @typescript-eslint/ban-types
 ;((axiosRetry as unknown) as Function)(axios, { retries: 3 })
 
+const jwt =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjEwNTgwNzI0fQ.vQ7FhEnlbAM-xYAiAF8sEFfApr0fjTT-kjJcDZ_9Qls'
 const cwd = process.cwd()
 const camerasPath = npath.join(cwd, 'cameras')
 
@@ -88,24 +90,22 @@ const decodePaths = async (url: string, paths: string[]) => {
         return state
       })()
 
-    promises.push(
-      axios
-        .get(`${url}/${path}`, {
-          responseType: 'arraybuffer',
-          headers: {
-            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjEwNDM3NDAwfQ.kJbYAEXprGtq-BxIFwg9uPP3gDne3UdbegN20CYfBQ4`,
-          },
+    await axios
+      .get(`${url}/${path}`, {
+        responseType: 'arraybuffer',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+      })
+      .then((r) => r.data)
+      .then((buffer) =>
+        state.tsList.push({
+          index: details.tsIndex,
+          buffer,
         })
-        .then((r) => r.data)
-        .then((buffer) =>
-          state.tsList.push({
-            index: details.tsIndex,
-            buffer,
-          })
-        )
-        .then(() => void 0)
-        .catch((r) => console.log('err', r.config.url))
-    )
+      )
+      .then(() => void 0)
+      .catch((r) => console.log('err', r.config.url))
   }
 
   await Promise.all(promises)
@@ -120,7 +120,6 @@ async function startWatch(cameraId: number) {
   fs.mkdirSync(npath.join(camerasPath, cameraId.toString()))
   const url = `http://localhost:8000/api/streams`
   const m3u8Url = `${url}/${cameraId}.m3u8`
-  let decodes: Promise<void>[] = []
 
   /**
    * - 読み込み済みの ts のパス
@@ -149,15 +148,10 @@ async function startWatch(cameraId: number) {
       continue
     }
 
-    await decodePaths(url, paths)
-
-    if (decodes.length > 2) {
-      await Promise.all(decodes)
-      decodes = []
-    }
+    decodePaths(url, paths)
   }
 }
 
 startWatch(1)
-startWatch(2)
-startWatch(3)
+// startWatch(2)
+// startWatch(3)
