@@ -59,7 +59,12 @@ export const parseM3u8 = (input: string): M3u8 => {
  * fetch a m3u8.
  */
 export async function fetchM3u8(url: string): Promise<M3u8> {
-  const res = await axios.get(url)
+  const res = await axios.get(url, {
+    headers: {
+      Authorization:
+        'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjA5ODI3MjYzfQ.fG6pjVHLiPTSs9a2omVR8wDRwCqfUL5CQsXbHQTSIbg',
+    },
+  })
 
   return parseM3u8(res.data)
 }

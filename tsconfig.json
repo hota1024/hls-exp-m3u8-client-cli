@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "outDir": "lib",
+    "downlevelIteration": true
   },
   "include": [
     "src"
