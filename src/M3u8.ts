@@ -62,7 +62,7 @@ export async function fetchM3u8(url: string): Promise<M3u8> {
   const res = await axios.get(url, {
     headers: {
       Authorization:
-        'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjA5ODI3MjYzfQ.fG6pjVHLiPTSs9a2omVR8wDRwCqfUL5CQsXbHQTSIbg',
+        'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjA5NjYxNjE3fQ.jSpjt0hjgvNJZSbQhukmFF2AZ0jyPou0yfn-dtGgu-o',
     },
   })
 

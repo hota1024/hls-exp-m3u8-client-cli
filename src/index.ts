@@ -5,15 +5,20 @@ import { Decoder } from 'ts-coder'
 import axios from 'axios'
 import * as axiosRetry from 'axios-retry'
 // eslint-disable-next-line @typescript-eslint/ban-types
+import { waitFor } from './waitFor'
 ;((axiosRetry as unknown) as Function)(axios, { retries: 3 })
 
+let allStartAt = 0
+
 const jwt =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjEwNTgwNzI0fQ.vQ7FhEnlbAM-xYAiAF8sEFfApr0fjTT-kjJcDZ_9Qls'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjA5NjYxNjE3fQ.jSpjt0hjgvNJZSbQhukmFF2AZ0jyPou0yfn-dtGgu-o'
 const cwd = process.cwd()
 const camerasPath = npath.join(cwd, 'cameras')
 
-fs.removeSync(camerasPath)
-fs.mkdirSync(camerasPath)
+// if (fs.pathExists(camerasPath)) {
+//   fs.removeSync(camerasPath)
+//   fs.mkdirSync(camerasPath)
+// }
 
 const PATH_DETIALS_EXP = /(\d+)\/(\d+)\/(\d+).ts/
 
@@ -46,11 +51,16 @@ const createDecoder = () => {
 
 const createState = (details: PathDetails): DecodeState => {
   const decoder = createDecoder()
+  const start = Date.now()
 
   decoder.onData((buffer) => {
     console.log(
-      npath.join(camerasPath, `${details.camera}/${details.frame}.bin`)
+      `${details.camera}/${details.frame}.bin`,
+      `${Date.now() - start}ms`
     )
+    if (details.frame === 100) {
+      console.log('end: ', Date.now() - allStartAt, 'ms')
+    }
     fs.writeFile(
       npath.join(camerasPath, `${details.camera}/${details.frame}.bin`),
       buffer
@@ -77,7 +87,7 @@ type DecodeState = {
 
 const decodePaths = async (url: string, paths: string[]) => {
   const states: DecodeState[] = []
-  const promises: Promise<void>[] = []
+  let promises: Promise<void>[] = []
 
   for (const path of paths) {
     const details = getPathDetails(path)
@@ -90,22 +100,34 @@ const decodePaths = async (url: string, paths: string[]) => {
         return state
       })()
 
-    await axios
-      .get(`${url}/${path}`, {
-        responseType: 'arraybuffer',
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-        },
-      })
-      .then((r) => r.data)
-      .then((buffer) =>
-        state.tsList.push({
-          index: details.tsIndex,
-          buffer,
+    /**
+     * - フレームごとのTSを並列で取得する
+     * - M3U8にではなくbinを載せる
+     */
+
+    promises.push(
+      axios
+        .get(`${url}/${path}`, {
+          responseType: 'arraybuffer',
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
         })
-      )
-      .then(() => void 0)
-      .catch((r) => console.log('err', r.config.url))
+        .then((r) => r.data)
+        .then((buffer) =>
+          state.tsList.push({
+            index: details.tsIndex,
+            buffer,
+          })
+        )
+        .then(() => void 0)
+        .catch((r) => console.log('err', r.config.url))
+    )
+
+    if (promises.length >= 20) {
+      await Promise.all(promises)
+      promises = []
+    }
   }
 
   await Promise.all(promises)
@@ -117,8 +139,13 @@ const decodePaths = async (url: string, paths: string[]) => {
 }
 
 async function startWatch(cameraId: number) {
-  fs.mkdirSync(npath.join(camerasPath, cameraId.toString()))
-  const url = `http://localhost:8000/api/streams`
+  const dirPath = npath.join(camerasPath, cameraId.toString())
+  if (fs.pathExistsSync(dirPath)) {
+    await fs.remove(dirPath)
+    console.log(`removed: ${dirPath}`)
+  }
+  fs.mkdirSync(dirPath)
+  const url = `http://3.112.70.1:8000/api/streams`
   const m3u8Url = `${url}/${cameraId}.m3u8`
 
   /**
@@ -132,11 +159,19 @@ async function startWatch(cameraId: number) {
    * 3. pathsの重複処理が行われていること
    */
 
+  let isReady = false
+
   while (true as const) {
     /**
      * - 最大 100 件の ts へのパスが記載されている
      */
     const m3u8 = await fetchM3u8(m3u8Url)
+
+    if (!isReady) {
+      console.log(`watching ${m3u8Url}`)
+      allStartAt = Date.now()
+      isReady = true
+    }
 
     /**
      * - 重複排除
@@ -152,6 +187,26 @@ async function startWatch(cameraId: number) {
   }
 }
 
-startWatch(1)
-// startWatch(2)
-// startWatch(3)
+startWatch(parseInt(process.argv[2]))
+
+// ;(async () => {
+//   const urls: string[] = []
+
+//   for (let i = 0; i < 11; ++i) {
+//     urls.push(`http://3.112.70.1:8000/api/streams/1/1/${i}.ts`)
+//   }
+//   console.log(urls)
+
+//   const promises = urls.map((url) =>
+//     axios.get(url, {
+//       responseType: 'arraybuffer',
+//       headers: {
+//         Authorization: `Bearer ${jwt}`,
+//       },
+//     })
+//   )
+
+//   console.time('requests')
+//   await Promise.all(promises)
+//   console.timeEnd('requests')
+// })()
