@@ -23,6 +23,6 @@
     "axios": "^0.21.1",
     "axios-retry": "^3.1.9",
     "fs-extra": "^9.0.1",
-    "ts-coder": "^0.0.4"
+    "ts-coder": "^0.0.5"
   }
 }
