@@ -9,6 +9,9 @@ import { waitFor } from './waitFor'
 ;((axiosRetry as unknown) as Function)(axios, { retries: 3 })
 
 let allStartAt = 0
+let allPaths = 0
+let frameCount = 0
+let tsCount = 0
 
 const jwt =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjA5NjYxNjE3fQ.jSpjt0hjgvNJZSbQhukmFF2AZ0jyPou0yfn-dtGgu-o'
@@ -54,17 +57,21 @@ const createState = (details: PathDetails): DecodeState => {
   const start = Date.now()
 
   decoder.onData((buffer) => {
+    frameCount++
     console.log(
       `${details.camera}/${details.frame}.bin`,
-      `${Date.now() - start}ms`
+      `${Date.now() - start}ms`,
+      frameCount
     )
-    if (details.frame === 100) {
+    if (frameCount === 100) {
       console.log('end: ', Date.now() - allStartAt, 'ms')
     }
     fs.writeFile(
       npath.join(camerasPath, `${details.camera}/${details.frame}.bin`),
       buffer
     )
+
+    // console.log(`${frameCount} ${Date.now() - allStartAt}ms`)
   })
 
   return {
@@ -87,7 +94,7 @@ type DecodeState = {
 
 const decodePaths = async (url: string, paths: string[]) => {
   const states: DecodeState[] = []
-  let promises: Promise<void>[] = []
+  let numOfProcess = 0
 
   for (const path of paths) {
     const details = getPathDetails(path)
@@ -105,36 +112,40 @@ const decodePaths = async (url: string, paths: string[]) => {
      * - M3U8にではなくbinを載せる
      */
 
-    promises.push(
-      axios
-        .get(`${url}/${path}`, {
-          responseType: 'arraybuffer',
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-          },
+    console.time(`${path}`)
+    numOfProcess++
+    axios
+      .get(`${url}/${path}`, {
+        responseType: 'arraybuffer',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+      })
+      .then((r) => r.data)
+      .then((buffer) => {
+        tsCount++
+        state.tsList.push({
+          index: details.tsIndex,
+          buffer,
         })
-        .then((r) => r.data)
-        .then((buffer) =>
-          state.tsList.push({
-            index: details.tsIndex,
-            buffer,
-          })
-        )
-        .then(() => void 0)
-        .catch((r) => console.log('err', r.config.url))
-    )
+        numOfProcess--
+        console.timeEnd(`${path}`)
+      })
+      .then(() => void 0)
+      .catch((r) => console.log('err', r.config.url))
 
-    if (promises.length >= 20) {
-      await Promise.all(promises)
-      promises = []
+    console.log(`waiting... current: ${numOfProcess}`)
+    // eslint-disable-next-line no-empty
+    while (numOfProcess >= 30) {
+      await waitFor(1)
     }
+    console.log(`done... current: ${numOfProcess}`)
   }
-
-  await Promise.all(promises)
 
   for (const state of states) {
     const sorted = state.tsList.sort((a, b) => a.index - b.index)
     sorted.forEach((ts) => state.decoder.push(ts.buffer))
+    console.log(state.frame)
   }
 }
 
@@ -172,6 +183,8 @@ async function startWatch(cameraId: number) {
       allStartAt = Date.now()
       isReady = true
     }
+
+    allPaths = Math.max(allPaths, m3u8.paths.length)
 
     /**
      * - 重複排除
