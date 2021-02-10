@@ -112,7 +112,7 @@ const decodePaths = async (url: string, paths: string[]) => {
      * - M3U8にではなくbinを載せる
      */
 
-    console.time(`${path}`)
+    // console.time(`${path}`)
     numOfProcess++
     axios
       .get(`${url}/${path}`, {
@@ -129,23 +129,28 @@ const decodePaths = async (url: string, paths: string[]) => {
           buffer,
         })
         numOfProcess--
-        console.timeEnd(`${path}`)
+        // console.timeEnd(`${path}`)
       })
       .then(() => void 0)
       .catch((r) => console.log('err', r.config.url))
 
-    console.log(`waiting... current: ${numOfProcess}`)
     // eslint-disable-next-line no-empty
-    while (numOfProcess >= 30) {
+    while (numOfProcess >= 40) {
       await waitFor(1)
     }
-    console.log(`done... current: ${numOfProcess}`)
+  }
+
+  while (numOfProcess > 0) {
+    await waitFor(1)
   }
 
   for (const state of states) {
     const sorted = state.tsList.sort((a, b) => a.index - b.index)
-    sorted.forEach((ts) => state.decoder.push(ts.buffer))
-    console.log(state.frame)
+    sorted.forEach((ts, i) => {
+      console.log(`${state.frame}/${i}`)
+      state.decoder.push(ts.buffer)
+    })
+    // console.log(state.frame)
   }
 }
 
