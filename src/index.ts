@@ -1,141 +1,84 @@
+import * as dotenv from 'dotenv'
+dotenv.config()
 import * as npath from 'path'
 import * as fs from 'fs-extra'
 import { fetchM3u8 } from './M3u8'
-import { Decoder } from 'ts-coder'
 import axios from 'axios'
 import * as axiosRetry from 'axios-retry'
-// eslint-disable-next-line @typescript-eslint/ban-types
+import { joinURL } from 'ufo'
+import { Decoder } from 'ts-coder'
 import { waitFor } from './waitFor'
+// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/ban-types
 ;((axiosRetry as unknown) as Function)(axios, { retries: 3 })
+import { getPathDetails } from './getPathDetails'
 
-let allStartAt = 0
 let allPaths = 0
-let frameCount = 0
-let tsCount = 0
+let numOfProcess = 0
+const pathQueue: string[] = []
+const states = new Map<
+  number,
+  Map<
+    number,
+    {
+      decoder: Decoder
+      tsList: Map<number, Buffer>
+    }
+  >
+>()
 
-const jwt =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjA5NjYxNjE3fQ.jSpjt0hjgvNJZSbQhukmFF2AZ0jyPou0yfn-dtGgu-o'
+const api = process.env.API
+const jwt = process.env.JWT
 const cwd = process.cwd()
 const camerasPath = npath.join(cwd, 'cameras')
+let allStartAt = 0
 
-// if (fs.pathExists(camerasPath)) {
-//   fs.removeSync(camerasPath)
-//   fs.mkdirSync(camerasPath)
-// }
+axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`
 
-const PATH_DETIALS_EXP = /(\d+)\/(\d+)\/(\d+).ts/
-
-type PathDetails = {
-  camera: number
-  frame: number
-  tsIndex: number
-}
-
-const getPathDetails = (path: string): PathDetails => {
-  const matches = path.match(PATH_DETIALS_EXP)
-
-  return {
-    camera: parseInt(matches[1]),
-    frame: parseInt(matches[2]),
-    tsIndex: parseInt(matches[3]),
+async function startQueue(threads: number) {
+  if (pathQueue.length === 0) {
+    setTimeout(startQueue, 1)
+    return
   }
-}
 
-const createDecoder = () => {
-  const decoder = new Decoder({
-    headSize: 4,
-    isEnd(head) {
-      return head[0] === 0x02
-    },
-  })
-
-  return decoder
-}
-
-const createState = (details: PathDetails): DecodeState => {
-  const decoder = createDecoder()
-  const start = Date.now()
-
-  decoder.onData((buffer) => {
-    frameCount++
-    console.log(
-      `${details.camera}/${details.frame}.bin`,
-      `${Date.now() - start}ms`,
-      frameCount
-    )
-    if (frameCount === 100) {
-      console.log('end: ', Date.now() - allStartAt, 'ms')
-    }
-    fs.writeFile(
-      npath.join(camerasPath, `${details.camera}/${details.frame}.bin`),
-      buffer
-    )
-
-    // console.log(`${frameCount} ${Date.now() - allStartAt}ms`)
-  })
-
-  return {
-    frame: details.frame,
-    decoder: decoder,
-    tsList: [],
-  }
-}
-
-type Ts = {
-  index: number
-  buffer: Buffer
-}
-
-type DecodeState = {
-  frame: number
-  decoder: Decoder
-  tsList: Ts[]
-}
-
-const decodePaths = async (url: string, paths: string[]) => {
-  const states: DecodeState[] = []
-  let numOfProcess = 0
-
-  for (const path of paths) {
+  while (pathQueue.length > 0) {
+    const path = pathQueue.shift()
     const details = getPathDetails(path)
+    const url = joinURL(api, 'api/streams', path)
 
-    const state =
-      states.find(({ frame }) => frame === details.frame) ??
-      (() => {
-        const state = createState(details)
-        states.push(state)
-        return state
-      })()
+    if (!states.has(details.camera)) {
+      // set camera
+      states.set(details.camera, new Map())
+    }
+    const cameraState = states.get(details.camera)
 
-    /**
-     * - フレームごとのTSを並列で取得する
-     * - M3U8にではなくbinを載せる
-     */
-
-    // console.time(`${path}`)
-    numOfProcess++
-    axios
-      .get(`${url}/${path}`, {
-        responseType: 'arraybuffer',
-        headers: {
-          Authorization: `Bearer ${jwt}`,
+    if (!cameraState.has(details.frame)) {
+      const decoder = new Decoder({
+        headSize: 4,
+        isEnd(head) {
+          return head[0] === 0x02
         },
       })
-      .then((r) => r.data)
-      .then((buffer) => {
-        tsCount++
-        state.tsList.push({
-          index: details.tsIndex,
-          buffer,
-        })
-        numOfProcess--
-        // console.timeEnd(`${path}`)
-      })
-      .then(() => void 0)
-      .catch((r) => console.log('err', r.config.url))
 
-    // eslint-disable-next-line no-empty
-    while (numOfProcess >= 40) {
+      // set frame
+      cameraState.set(details.frame, {
+        decoder,
+        tsList: new Map(),
+      })
+    }
+    const frameState = cameraState.get(details.frame)
+
+    numOfProcess++
+    axios
+      .get(url, {
+        responseType: 'arraybuffer',
+      })
+      .then((r) => {
+        numOfProcess--
+        frameState.tsList.set(details.tsIndex, r.data)
+      })
+
+    while (numOfProcess >= threads) {
       await waitFor(1)
     }
   }
@@ -144,24 +87,35 @@ const decodePaths = async (url: string, paths: string[]) => {
     await waitFor(1)
   }
 
-  for (const state of states) {
-    const sorted = state.tsList.sort((a, b) => a.index - b.index)
-    sorted.forEach((ts, i) => {
-      console.log(`${state.frame}/${i}`)
-      state.decoder.push(ts.buffer)
-    })
-    // console.log(state.frame)
+  for (const [cameraId, camera] of states.entries()) {
+    for (const [frameNumber, frame] of camera.entries()) {
+      const sortedKeys = [...frame.tsList.keys()].sort((a, b) => a - b)
+      frame.decoder.onData((buffer) => {
+        if (frameNumber === 100) {
+          console.log(`end: ${Date.now() - allStartAt}ms`)
+        }
+        fs.writeFile(
+          npath.join(camerasPath, `${cameraId}/${frameNumber}.bin`),
+          buffer
+        )
+      })
+      sortedKeys
+        .map((k) => frame.tsList.get(k))
+        .forEach((b) => frame.decoder.push(b))
+    }
   }
+
+  setTimeout(startQueue, 0)
 }
 
-async function startWatch(cameraId: number) {
+async function startWatch(cameraId: number, threads: number) {
   const dirPath = npath.join(camerasPath, cameraId.toString())
   if (fs.pathExistsSync(dirPath)) {
     await fs.remove(dirPath)
     console.log(`removed: ${dirPath}`)
   }
   fs.mkdirSync(dirPath)
-  const url = `http://3.112.70.1:8000/api/streams`
+  const url = joinURL(api, 'api/streams')
   const m3u8Url = `${url}/${cameraId}.m3u8`
 
   /**
@@ -185,8 +139,9 @@ async function startWatch(cameraId: number) {
 
     if (!isReady) {
       console.log(`watching ${m3u8Url}`)
-      allStartAt = Date.now()
       isReady = true
+      allStartAt = Date.now()
+      startQueue(threads)
     }
 
     allPaths = Math.max(allPaths, m3u8.paths.length)
@@ -201,11 +156,14 @@ async function startWatch(cameraId: number) {
       continue
     }
 
-    decodePaths(url, paths)
+    pathQueue.push(...paths)
   }
 }
 
-startWatch(parseInt(process.argv[2]))
+startWatch(
+  parseInt(process.argv[2]),
+  process.argv[3] ? parseInt(process.argv[3]) : 1
+)
 
 // ;(async () => {
 //   const urls: string[] = []

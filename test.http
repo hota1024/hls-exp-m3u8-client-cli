@@ -1,2 +1,7 @@
 GET http://13.231.196.168:8000/api/streams/1/12/2.ts
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjEwNTgwNzI0fQ.vQ7FhEnlbAM-xYAiAF8sEFfApr0fjTT-kjJcDZ_9Qls
+
+###
+
+GET http://3.112.70.1:8000/api/streams/1.m3u8
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNjEwNTgwNzI0fQ.vQ7FhEnlbAM-xYAiAF8sEFfApr0fjTT-kjJcDZ_9Qls
